@@ -3,11 +3,12 @@ const fs = require('node:fs');
 const { token } = require('./config.json');
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const http = require('http');
+const { encrypt, decrypt } = require('./crypto-utils');
 
 
 client.commands = new Collection();
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
-const id = fs.readFileSync('./id.json', 'utf-8');
+const id = fs.readFileSync('./ip.json', 'utf-8');
 const idParsed = JSON.parse(id);
 
 for (const file of commandFiles) {
@@ -41,16 +42,31 @@ const server = http.createServer(async (req, res) => {
         let body = '';
         req.on('data', chunk => body += chunk);
         req.on('end', async () => {
+
+            const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
             try {
                 const data = JSON.parse(body);
-
                 const guildId = data.serverId;
                 const channelId = data.channelId;
 
                 const guild = await client.guilds.fetch(guildId);
                 const channel = await guild.channels.fetch(channelId);
 
-                console.log(data);
+                let jsonParsed = { Server: [] };
+
+                if (fs.existsSync('./ip.json')) {
+                    const json = fs.readFileSync('./ip.json', 'utf-8');
+                    jsonParsed = JSON.parse(json);
+                }
+
+                // Vérifie si cette association existe déjà
+                const exists = jsonParsed.Server.some(entry => entry[channelId] === ip);
+
+                if (!exists) {
+                    jsonParsed.Server.push({ [channelId]: encrypt(ip) });
+                    fs.writeFileSync('./ip.json', JSON.stringify(jsonParsed, null, 2), 'utf-8');
+                }
 
                 if (channel.isTextBased() && data.player != 'Jishuashi') {
                     const filteredMessage = removeLinks(data.message);

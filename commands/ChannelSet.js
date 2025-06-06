@@ -2,7 +2,7 @@ const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { InteractionResponseType, MessageFlags } = require('discord-api-types/v10');
 const fs = require('fs');
 const path = require('path');
-const CONFIG_PATH = path.resolve(__dirname, '../id.json');
+const CONFIG_PATH = path.resolve(__dirname, '../ip.json');
 
 module.exports = {
     data: new SlashCommandBuilder()
