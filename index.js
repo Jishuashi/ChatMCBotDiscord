@@ -58,6 +58,10 @@ const server = http.createServer(async (req, res) => {
                 if (fs.existsSync('./ip.json')) {
                     const json = fs.readFileSync('./ip.json', 'utf-8');
                     jsonParsed = JSON.parse(json);
+                }else{
+                    ensureIpJsonExists();
+                    const json = fs.readFileSync('./ip.json', 'utf-8');
+                    jsonParsed = JSON.parse(json);
                 }
 
                 // Vérifie si cette association existe déjà
@@ -167,6 +171,20 @@ function cleanMinecraftPrefix(prefix) {
     return cleaned.trim();
 }
 
+function ensureIpJsonExists() {
+    const path = './ip.json';
+
+    if (!fs.existsSync(path)) {
+        const defaultContent = {
+            Server: []
+        };
+
+        fs.writeFileSync(path, JSON.stringify(defaultContent, null, 2), 'utf-8');
+        console.log('🆕 Fichier ip.json créé.');
+    } else {
+        console.log('✅ ip.json déjà présent.');
+    }
+}
 
 
 
