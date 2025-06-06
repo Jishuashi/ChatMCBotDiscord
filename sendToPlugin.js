@@ -3,6 +3,7 @@ const { decrypt } = require('./crypto-utils');
 
 function sendRequestToServer(serverId, encryptedIpMap, payload = {}) {
     const encryptedIp = encryptedIpMap.get(serverId);
+
     if (!encryptedIp) {
         console.error(`[ERROR] No encrypted IP for server ${serverId}`);
         return;
@@ -12,7 +13,7 @@ function sendRequestToServer(serverId, encryptedIpMap, payload = {}) {
 
     const options = {
         hostname: ip,
-        port: 4001,
+        port: process.env.TARGET_PORT || 4001, // fallback si pas défini
         path: '/mc-endpoint',
         method: 'POST',
         headers: {

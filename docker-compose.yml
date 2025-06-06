@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+    botdiscord:
+      build: .
+      ports:
+        - "3000:3000"
+      env_file:
+        - .env
+      environment:
+        TARGET_PORT: "4001"   # (si tu veux accéder à la variable depuis le bot)
