@@ -26,3 +26,4 @@ logs/
 
 # Optional
 .DS_Store
+config.json

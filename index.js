@@ -1,6 +1,7 @@
 const { Client, GatewayIntentBits, Collection, Events, messageLink} = require('discord.js');
 const fs = require('node:fs');
 const { token } = require('./config.json');
+require('dotenv').config();
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -57,7 +58,7 @@ client.on('messageCreate', (message) => {
     sendRequestToServer(serverId, encryptedIps, {name: `${capitalizedUsername}`, message: message.content });
 });
 
-client.login(token);
+client.login(process.env.DISCORD_TOKEN);
 
 // ⬇️ Ecoute les messages depuis un processus externe
 const server = http.createServer(async (req, res) => {
