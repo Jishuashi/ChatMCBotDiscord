@@ -51,16 +51,9 @@ client.on('messageCreate', (message) => {
 
     const capitalizedUsername = username.charAt(0).toUpperCase() + username.slice(1);
 
-    console.log({name: `${capitalizedUsername}`, message: message.content });
-
-    console.log('allowedChannels:', allowedChannels);
-    console.log('serverId:', serverId);
-    console.log('channelId:', channelId);
-
     if (!allowedChannels.has(serverId)) return;
     if (allowedChannels.get(serverId) !== channelId) return;
 
-    console.log('[DEBUG] Avant appel sendRequestToServer');
     sendRequestToServer(serverId, encryptedIps, {name: `${capitalizedUsername}`, message: message.content });
 });
 

@@ -9,7 +9,7 @@ COPY . .
 
 EXPOSE 3000
 
-CMD sh -c 'test -f /app/ip.json || echo "{ \"Server\": [] }" > /app/ip.json && nodemon index.js'
+CMD sh -c 'if [ ! -f /app/ip.json ]; then echo "{ \"Server\": [] }" > /app/ip.json; fi && node index.js'
 
 
 
