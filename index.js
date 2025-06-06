@@ -1,15 +1,21 @@
 const { Client, GatewayIntentBits, Collection, Events, messageLink} = require('discord.js');
 const fs = require('node:fs');
 const { token } = require('./config.json');
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent
+    ]
+});
 const http = require('http');
 const { encrypt, decrypt } = require('./crypto-utils');
+const { loadIpConfig } = require('./ipManager');
+const { sendRequestToServer } = require('./sendToPlugin');
 
 
 client.commands = new Collection();
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
-const id = fs.readFileSync('./ip.json', 'utf-8');
-const idParsed = JSON.parse(id);
 
 for (const file of commandFiles) {
     const command = require(`./commands/${file}`);
@@ -34,6 +40,23 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 });
 
+let { allowedChannels, encryptedIps } = loadIpConfig();
+
+client.on('messageCreate', (message) => {
+    if (message.author.bot) return;
+
+    const username = message.author.username;
+    const serverId = message.guildId;
+    const channelId = message.channel.id;
+
+    const capitalizedUsername = username.charAt(0).toUpperCase() + username.slice(1);
+
+    if (!allowedChannels.has(serverId)) return;
+    if (allowedChannels.get(serverId) !== channelId) return;
+
+    sendRequestToServer(serverId, encryptedIps, {name: `${capitalizedUsername}`, message: message.content });
+});
+
 client.login(token);
 
 // ⬇️ Ecoute les messages depuis un processus externe
@@ -42,7 +65,6 @@ const server = http.createServer(async (req, res) => {
         let body = '';
         req.on('data', chunk => body += chunk);
         req.on('end', async () => {
-
             const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
             try {
@@ -58,21 +80,28 @@ const server = http.createServer(async (req, res) => {
                 if (fs.existsSync('./ip.json')) {
                     const json = fs.readFileSync('./ip.json', 'utf-8');
                     jsonParsed = JSON.parse(json);
-                }else{
+                } else {
                     ensureIpJsonExists();
                     const json = fs.readFileSync('./ip.json', 'utf-8');
                     jsonParsed = JSON.parse(json);
                 }
 
-                // Vérifie si cette association existe déjà
-                const exists = jsonParsed.Server.some(entry => entry[channelId] === ip);
+                const encryptedIp = encrypt(ip);
+
+                const exists = jsonParsed.Server.some(entry =>
+                    entry[guildId] && entry.Channel === channelId
+                );
 
                 if (!exists) {
-                    jsonParsed.Server.push({ [channelId]: encrypt(ip) });
+                    jsonParsed.Server.push({
+                        [guildId]: encryptedIp,
+                        Channel: channelId
+                    });
+
                     fs.writeFileSync('./ip.json', JSON.stringify(jsonParsed, null, 2), 'utf-8');
                 }
 
-                if (channel.isTextBased() && data.player != 'Jishuashi') {
+                if (channel.isTextBased() && data.player !== 'Jishuashi') {
                     const filteredMessage = removeLinks(data.message);
 
                     if (containsAsciiArt(data.message)) {
@@ -80,37 +109,19 @@ const server = http.createServer(async (req, res) => {
                             content: `${data.player} : 🚫 Message bloqué : probable ASCII art`,
                             allowedMentions: { parse: [] }
                         });
-
                         return;
                     }
 
-                    if(data.prefix != ""){
-                        await channel.send({
-                            content: `${cleanMinecraftPrefix(data.prefix)} ${data.player} : ${filteredMessage}`,
-                            allowedMentions: { parse: [] }
-                        });
-                    }else{
-                        await channel.send({
-                            content: `${data.player} : ${filteredMessage}`,
-                            allowedMentions: { parse: [] }
-                        });
-                    }
+                    await channel.send({
+                        content: `${data.prefix ? cleanMinecraftPrefix(data.prefix) + ' ' : ''}${data.player} : ${filteredMessage}`,
+                        allowedMentions: { parse: [] }
+                    });
                     return;
-
-
-                    console.log('✅ Message envoyé sur Discord');
-                }else {
-                    if(data.prefix != ""){
-                        await channel.send({
-                            content: `${cleanMinecraftPrefix(data.prefix)} ${data.player} : ${data.message}`,
-                            allowedMentions: { parse: [] }
-                        });
-                    }else{
-                        await channel.send({
-                            content: `${data.player} : ${data.message}`,
-                            allowedMentions: { parse: [] }
-                        });
-                    }
+                } else {
+                    await channel.send({
+                        content: `${data.prefix ? cleanMinecraftPrefix(data.prefix) + ' ' : ''}${data.player} : ${data.message}`,
+                        allowedMentions: { parse: [] }
+                    });
                     return;
                 }
 
@@ -118,7 +129,7 @@ const server = http.createServer(async (req, res) => {
                 res.end('OK');
             } catch (err) {
                 console.error('❌ Erreur JSON :', err.message);
-                console.error('❌ Données reçues (malformées ?) :', body); // <== VOICI
+                console.error('❌ Données reçues (malformées ?) :', body);
                 res.writeHead(400);
                 res.end('Bad Request - JSON invalide');
             }
@@ -128,6 +139,7 @@ const server = http.createServer(async (req, res) => {
         res.end();
     }
 });
+
 
 server.listen(3000, () => {
     console.log('🌐 listener HTTP en écoute sur http://localhost:3000');
